@@ -69,7 +69,7 @@ for /f "tokens=*" %%i in ('aws elbv2 create-target-group --name hyundai-login-tg
 echo Target Group ARN: %TARGET_GROUP_ARN%
 
 REM Listener 생성
-for /f "tokens=*" %%i in ('aws elbv2 create-listener --load-balancer-arn %LOAD_BALANCER_ARN% --protocol HTTP --port 80 --default-actions Type=forward,TargetGroupArn=%TARGET_GROUP_ARN% --region ap-northeast-2 --query "Listeners[0].ListenerArn" --output text') do set LISTENER_ARN=%%i
+for /f "tokens=*" %%i in ('aws elbv2 create-listener --load-balancer-arn %LOAD_BALANCER_ARN% --protocol HTTP --port 80 --default-actions "Type=forward,TargetGroupArn=%TARGET_GROUP_ARN%" --region ap-northeast-2 --query "Listeners[0].ListenerArn" --output text') do set LISTENER_ARN=%%i
 echo Listener ARN: %LISTENER_ARN%
 
 REM 6. 설정 파일 업데이트
