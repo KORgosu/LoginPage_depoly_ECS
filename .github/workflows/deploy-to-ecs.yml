@@ -56,10 +56,14 @@ jobs:
       run: |
         jq '.containerDefinitions[0].image = "${{ steps.build-image.outputs.image }}"' task-definition.json > new-task-definition.json
         
+    - name: Clean task definition for registration
+      run: |
+        jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' new-task-definition.json > clean-task-definition.json
+        
     - name: Register new task definition
       run: |
         aws ecs register-task-definition \
-          --cli-input-json file://new-task-definition.json \
+          --cli-input-json file://clean-task-definition.json \
           --region ${{ env.AWS_REGION }}
           
     - name: Update ECS service
