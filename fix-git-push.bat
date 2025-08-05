@@ -1,12 +1,12 @@
 @echo off
 chcp 65001 >nul
 echo ========================================
-echo Trigger GitHub Actions Deployment
+echo Fix Git Push and Trigger Deployment
 echo ========================================
 echo.
 
-echo 1. Checking current git status...
-git status
+echo 1. Checking current branch...
+git branch
 
 echo.
 echo 2. Adding all changes...
@@ -14,15 +14,15 @@ git add .
 
 echo.
 echo 3. Committing changes...
-git commit -m "Trigger deployment - %date% %time%"
+git commit -m "Update deployment scripts - %date% %time%"
 
 echo.
-echo 4. Pushing to GitHub...
+echo 4. Pushing to GitHub (master branch)...
 git push origin master
 
 echo.
 echo ========================================
-echo Deployment triggered successfully!
+echo Git push completed!
 echo ========================================
 echo.
 echo Next steps:
