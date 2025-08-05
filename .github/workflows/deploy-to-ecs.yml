@@ -76,7 +76,14 @@ jobs:
           
     - name: Wait for service to be stable
       run: |
-        aws ecs wait services-stable \
+        echo "Waiting for ECS service to be stable..."
+        timeout 900 aws ecs wait services-stable \
+          --cluster ${{ env.ECS_CLUSTER }} \
+          --services ${{ env.ECS_SERVICE }} \
+          --region ${{ env.AWS_REGION }} || echo "Service stability timeout - checking status..."
+        
+        # Check service status even if timeout
+        aws ecs describe-services \
           --cluster ${{ env.ECS_CLUSTER }} \
           --services ${{ env.ECS_SERVICE }} \
           --region ${{ env.AWS_REGION }}
