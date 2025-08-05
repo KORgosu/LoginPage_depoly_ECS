@@ -45,18 +45,44 @@ jobs:
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
         echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-    - name: Fill in the new image ID in the Amazon ECS task definition
-      id: task-def
-      uses: aws-actions/amazon-ecs-render-task-definition@v2
-      with:
-        task-definition: ecs-task-definition.json
-        container-name: hyundai-login-app
-        image: ${{ steps.build-image.outputs.image }}
-
-    - name: Deploy Amazon ECS task definition
-      uses: aws-actions/amazon-ecs-deploy-task-definition@v2
-      with:
-        task-definition: ${{ steps.task-def.outputs.task-definition }}
-        service: ${{ env.ECS_SERVICE }}
-        cluster: ${{ env.ECS_CLUSTER }}
-        wait-for-service-stability: true 
+    - name: Download task definition
+      run: |
+        aws ecs describe-task-definition \
+          --task-definition ${{ env.ECS_TASK_DEFINITION }} \
+          --region ${{ env.AWS_REGION }} \
+          --query taskDefinition > task-definition.json
+          
+    - name: Update task definition with new image
+      run: |
+        jq '.containerDefinitions[0].image = "${{ steps.build-image.outputs.image }}"' task-definition.json > new-task-definition.json
+        
+    - name: Register new task definition
+      run: |
+        aws ecs register-task-definition \
+          --cli-input-json file://new-task-definition.json \
+          --region ${{ env.AWS_REGION }}
+          
+    - name: Update ECS service
+      run: |
+        aws ecs update-service \
+          --cluster ${{ env.ECS_CLUSTER }} \
+          --service ${{ env.ECS_SERVICE }} \
+          --task-definition ${{ env.ECS_TASK_DEFINITION }} \
+          --region ${{ env.AWS_REGION }}
+          
+    - name: Wait for service to be stable
+      run: |
+        aws ecs wait services-stable \
+          --cluster ${{ env.ECS_CLUSTER }} \
+          --services ${{ env.ECS_SERVICE }} \
+          --region ${{ env.AWS_REGION }}
+          
+    - name: Get ALB URL
+      run: |
+        ALB_DNS=$(aws elbv2 describe-load-balancers \
+          --names hyundai-login-alb \
+          --query 'LoadBalancers[0].DNSName' \
+          --output text \
+          --region ${{ env.AWS_REGION }})
+        echo "🌐 로그인 페이지 URL: http://$ALB_DNS"
+        echo "URL=http://$ALB_DNS" >> $GITHUB_ENV 
