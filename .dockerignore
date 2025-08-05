@@ -1,0 +1,11 @@
+node_modules
+npm-debug.log
+build
+.git
+.gitignore
+README.md
+server
+src/components/Master.js
+src/components/Guest.js
+src/components/CreateGuest.js
+src/components/BranchManager.js
