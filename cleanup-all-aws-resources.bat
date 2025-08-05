@@ -57,17 +57,25 @@ echo.
 echo ========================================
 echo 4. ALB 및 Target Group 삭제
 echo ========================================
+echo Getting ALB ARN dynamically...
+for /f "tokens=*" %%i in ('aws elbv2 describe-load-balancers --names hyundai-login-alb --region ap-northeast-2 --query "LoadBalancers[0].LoadBalancerArn" --output text') do set ALB_ARN=%%i
+echo ALB ARN: %ALB_ARN%
+
 echo ALB Listener 삭제...
-for /f "tokens=*" %%i in ('aws elbv2 describe-listeners --load-balancer-arn arn:aws:elasticloadbalancing:ap-northeast-2:716773066105:loadbalancer/app/hyundai-login-alb/f52689f8624aaeb4 --region ap-northeast-2 --query "Listeners[0].ListenerArn" --output text') do set LISTENER_ARN=%%i
+for /f "tokens=*" %%i in ('aws elbv2 describe-listeners --load-balancer-arn %ALB_ARN% --region ap-northeast-2 --query "Listeners[0].ListenerArn" --output text') do set LISTENER_ARN=%%i
 if not "%LISTENER_ARN%"=="None" (
     aws elbv2 delete-listener --listener-arn %LISTENER_ARN% --region ap-northeast-2
 )
 
 echo ALB 삭제...
-aws elbv2 delete-load-balancer --load-balancer-arn arn:aws:elasticloadbalancing:ap-northeast-2:716773066105:loadbalancer/app/hyundai-login-alb/f52689f8624aaeb4 --region ap-northeast-2
+aws elbv2 delete-load-balancer --load-balancer-arn %ALB_ARN% --region ap-northeast-2
+
+echo Getting Target Group ARN dynamically...
+for /f "tokens=*" %%i in ('aws elbv2 describe-target-groups --names hyundai-login-tg --region ap-northeast-2 --query "TargetGroups[0].TargetGroupArn" --output text') do set TARGET_GROUP_ARN=%%i
+echo Target Group ARN: %TARGET_GROUP_ARN%
 
 echo Target Group 삭제...
-aws elbv2 delete-target-group --target-group-arn arn:aws:elasticloadbalancing:ap-northeast-2:716773066105:targetgroup/hyundai-login-tg/898916fb71ca683f --region ap-northeast-2
+aws elbv2 delete-target-group --target-group-arn %TARGET_GROUP_ARN% --region ap-northeast-2
 
 echo.
 echo ========================================
