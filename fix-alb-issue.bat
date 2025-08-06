@@ -25,16 +25,25 @@ if %errorlevel% equ 0 (
 echo.
 echo 2. Creating Target Group...
 aws elbv2 create-target-group --name hyundai-login-tg --protocol HTTP --port 80 --vpc-id vpc-09089a6ae15a1fbf3 --target-type ip --region ap-northeast-2 2>nul
+if errorlevel 1 (
+    echo Target Group already exists, getting ARN...
+) else (
+    echo Target Group created successfully
+)
 for /f "tokens=*" %%i in ('aws elbv2 describe-target-groups --names hyundai-login-tg --region ap-northeast-2 --query "TargetGroups[0].TargetGroupArn" --output text') do set TARGET_GROUP_ARN=%%i
 echo Target Group ARN: %TARGET_GROUP_ARN%
 
 echo.
 echo 3. Creating ALB Listener...
 aws elbv2 create-listener --load-balancer-arn %ALB_ARN% --protocol HTTP --port 80 --default-actions "Type=forward,TargetGroupArn=%TARGET_GROUP_ARN%" --region ap-northeast-2 2>nul
-if %errorlevel% equ 0 (
-    echo Listener created successfully
+if errorlevel 1 (
+    echo Listener already exists, getting ARN...
+    for /f "tokens=*" %%i in ('aws elbv2 describe-listeners --load-balancer-arn %ALB_ARN% --query "Listeners[0].ListenerArn" --output text --region ap-northeast-2') do set LISTENER_ARN=%%i
+    echo Listener ARN: %LISTENER_ARN%
 ) else (
-    echo Listener already exists or error occurred
+    echo Listener created successfully
+    for /f "tokens=*" %%i in ('aws elbv2 describe-listeners --load-balancer-arn %ALB_ARN% --query "Listeners[0].ListenerArn" --output text --region ap-northeast-2') do set LISTENER_ARN=%%i
+    echo Listener ARN: %LISTENER_ARN%
 )
 
 echo.

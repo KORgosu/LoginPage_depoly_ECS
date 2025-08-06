@@ -49,27 +49,51 @@ echo Subnet 1: %SUBNET_1%
 echo Subnet 2: %SUBNET_2%
 
 REM 보안 그룹 생성
-for /f "tokens=*" %%i in ('aws ec2 create-security-group --group-name hyundai-login-sg --description "Security group for Hyundai Login App" --vpc-id %VPC_ID% --query "GroupId" --output text') do set SECURITY_GROUP_ID=%%i
+aws ec2 create-security-group --group-name hyundai-login-sg --description "Security group for Hyundai Login App" --vpc-id %VPC_ID% 2>nul
+if errorlevel 1 (
+    echo Security group already exists, getting ID...
+    for /f "tokens=*" %%i in ('aws ec2 describe-security-groups --filters "Name=group-name,Values=hyundai-login-sg" --query "SecurityGroups[0].GroupId" --output text') do set SECURITY_GROUP_ID=%%i
+) else (
+    for /f "tokens=*" %%i in ('aws ec2 describe-security-groups --filters "Name=group-name,Values=hyundai-login-sg" --query "SecurityGroups[0].GroupId" --output text') do set SECURITY_GROUP_ID=%%i
+)
 echo Security Group ID: %SECURITY_GROUP_ID%
 
-REM 보안 그룹 규칙 추가
-aws ec2 authorize-security-group-ingress --group-id %SECURITY_GROUP_ID% --protocol tcp --port 80 --cidr 0.0.0.0/0
-aws ec2 authorize-security-group-ingress --group-id %SECURITY_GROUP_ID% --protocol tcp --port 443 --cidr 0.0.0.0/0
+REM 보안 그룹 규칙 추가 (이미 존재하는 경우 무시)
+aws ec2 authorize-security-group-ingress --group-id %SECURITY_GROUP_ID% --protocol tcp --port 80 --cidr 0.0.0.0/0 2>nul
+aws ec2 authorize-security-group-ingress --group-id %SECURITY_GROUP_ID% --protocol tcp --port 443 --cidr 0.0.0.0/0 2>nul
 echo Security group rules added successfully
 
 REM 5. Application Load Balancer 설정
 echo Setting up Application Load Balancer...
 
-REM ALB 생성
-for /f "tokens=*" %%i in ('aws elbv2 create-load-balancer --name hyundai-login-alb --subnets %SUBNET_1% %SUBNET_2% --security-groups %SECURITY_GROUP_ID% --region ap-northeast-2 --query "LoadBalancers[0].LoadBalancerArn" --output text') do set LOAD_BALANCER_ARN=%%i
+REM ALB 생성 (이미 존재하는 경우 기존 ARN 사용)
+aws elbv2 create-load-balancer --name hyundai-login-alb --subnets %SUBNET_1% %SUBNET_2% --security-groups %SECURITY_GROUP_ID% --region ap-northeast-2 2>nul
+if errorlevel 1 (
+    echo ALB already exists, getting ARN...
+) else (
+    echo ALB created successfully
+)
+for /f "tokens=*" %%i in ('aws elbv2 describe-load-balancers --names hyundai-login-alb --query "LoadBalancers[0].LoadBalancerArn" --output text --region ap-northeast-2') do set LOAD_BALANCER_ARN=%%i
 echo ALB ARN: %LOAD_BALANCER_ARN%
 
-REM Target Group 생성
-for /f "tokens=*" %%i in ('aws elbv2 create-target-group --name hyundai-login-tg --protocol HTTP --port 80 --vpc-id %VPC_ID% --target-type ip --region ap-northeast-2 --query "TargetGroups[0].TargetGroupArn" --output text') do set TARGET_GROUP_ARN=%%i
+REM Target Group 생성 (이미 존재하는 경우 기존 ARN 사용)
+aws elbv2 create-target-group --name hyundai-login-tg --protocol HTTP --port 80 --vpc-id %VPC_ID% --target-type ip --region ap-northeast-2 2>nul
+if errorlevel 1 (
+    echo Target Group already exists, getting ARN...
+) else (
+    echo Target Group created successfully
+)
+for /f "tokens=*" %%i in ('aws elbv2 describe-target-groups --names hyundai-login-tg --query "TargetGroups[0].TargetGroupArn" --output text --region ap-northeast-2') do set TARGET_GROUP_ARN=%%i
 echo Target Group ARN: %TARGET_GROUP_ARN%
 
-REM Listener 생성
-for /f "tokens=*" %%i in ('aws elbv2 create-listener --load-balancer-arn %LOAD_BALANCER_ARN% --protocol HTTP --port 80 --default-actions "Type=forward,TargetGroupArn=%TARGET_GROUP_ARN%" --region ap-northeast-2 --query "Listeners[0].ListenerArn" --output text') do set LISTENER_ARN=%%i
+REM Listener 생성 (이미 존재하는 경우 기존 ARN 사용)
+aws elbv2 create-listener --load-balancer-arn %LOAD_BALANCER_ARN% --protocol HTTP --port 80 --default-actions "Type=forward,TargetGroupArn=%TARGET_GROUP_ARN%" --region ap-northeast-2 2>nul
+if errorlevel 1 (
+    echo Listener already exists, getting ARN...
+) else (
+    echo Listener created successfully
+)
+for /f "tokens=*" %%i in ('aws elbv2 describe-listeners --load-balancer-arn %LOAD_BALANCER_ARN% --query "Listeners[0].ListenerArn" --output text --region ap-northeast-2') do set LISTENER_ARN=%%i
 echo Listener ARN: %LISTENER_ARN%
 
 REM 6. 설정 파일 업데이트
@@ -86,9 +110,14 @@ REM Task Definition 등록
 aws ecs register-task-definition --cli-input-json file://ecs-task-definition.json --region ap-northeast-2
 echo Task definition registered successfully
 
-REM 서비스 생성
-aws ecs create-service --cluster hyundai-login-cluster --service-name hyundai-login-service --task-definition hyundai-login-task --desired-count 1 --launch-type FARGATE --network-configuration "awsvpcConfiguration={subnets=[%SUBNET_1%,%SUBNET_2%],securityGroups=[%SECURITY_GROUP_ID%],assignPublicIp=ENABLED}" --load-balancers "targetGroupArn=%TARGET_GROUP_ARN%,containerName=hyundai-login-app,containerPort=80" --region ap-northeast-2
-echo ECS service created successfully
+REM 서비스 생성 (이미 존재하는 경우 업데이트)
+aws ecs create-service --cluster hyundai-login-cluster --service-name hyundai-login-service --task-definition hyundai-login-task --desired-count 1 --launch-type FARGATE --network-configuration "awsvpcConfiguration={subnets=[%SUBNET_1%,%SUBNET_2%],securityGroups=[%SECURITY_GROUP_ID%],assignPublicIp=ENABLED}" --load-balancers "targetGroupArn=%TARGET_GROUP_ARN%,containerName=hyundai-login-app,containerPort=80" --region ap-northeast-2 2>nul
+if errorlevel 1 (
+    echo Service already exists, updating...
+    aws ecs update-service --cluster hyundai-login-cluster --service hyundai-login-service --task-definition hyundai-login-task --region ap-northeast-2
+) else (
+    echo ECS service created successfully
+)
 
 REM 8. ALB DNS 이름 출력
 echo Getting ALB DNS name...
