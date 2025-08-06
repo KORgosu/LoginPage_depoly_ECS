@@ -131,6 +131,9 @@ Firebase Authentication
 - **문제**: 읽기 전용 필드 포함으로 인한 등록 실패
 - **해결**: 불필요한 필드 제거 후 등록
 
+
+
+
 ## 🎯 최종 결과
 
 ### ✅ 성공한 항목들
@@ -168,5 +171,3 @@ Firebase Authentication
 
 ### Monitoring
 - **AWS CloudWatch** - 로그 및 모니터링
-
-
